@@ -1,14 +1,17 @@
 import scrapy
 import csv
 import json
-
 from gstServices.items import GstservicesItem
 
 
 class QuotesSpider(scrapy.Spider):
+    # name of crawler
     name = "services"
+    # url of site to be crawled
     start_urls = ['https://www.indiafilings.com/find-gst-rate']
 
+    # parse each of titles obtained
+    # make request to each of the titles to get corresponding data
     def parse(self, response):
         titles = response.xpath('//*[@id="Services33"]/div/div/div')
         i = 1
@@ -19,6 +22,7 @@ class QuotesSpider(scrapy.Spider):
                     'h5/text()').extract()[0], 'id': i})
             i = i + 1
 
+    # parse each of data in each titles
     def parse_title_page(self, response):
         title = response.meta["title"]
         try:
@@ -27,6 +31,8 @@ class QuotesSpider(scrapy.Spider):
             sub_title = ''
             description = ''
             sac_code = ''
+
+            # looping through each of rows obtained to seperate title, sub_title,description
             for row in table_rows.xpath('tr'):
                 temp_sub_title = row.xpath('td/strong/text()').extract()
                 if len(temp_sub_title) > 0:
@@ -42,6 +48,7 @@ class QuotesSpider(scrapy.Spider):
                     sac_code = _sac_code[0]
                 if sac_code != '':
                     try:
+                        # making request to find gst rate for each view button
                         re = scrapy.FormRequest(url="https://www.indiafilings.com/get-description.php",
                                                 formdata={'query': description, 'section': 'Services'},
                                                 callback=self.parse_rate, dont_filter=True, meta={'title': title,
@@ -63,18 +70,15 @@ class QuotesSpider(scrapy.Spider):
         except Exception as e:
             print "not valid", e
 
+    # function to get gst rates and yield it to csv file
     def parse_rate(self, response):
         if response.body:
-            # print response.body
-            # self.log("ressssssssssssssssssssssssss {}".format(response.body))
             rateArr = json.loads(response.body)
             rate = rateArr[0]['rate']
-            # number=response.meta["number"],
             title = response.meta["title"],
             sub_title = response.meta["sub_title"],
             description = response.meta["description"],
             sac_code = response.meta["sac_code"]
-            # yield GstItem(chapter_name=chapter_name)
 
             yield GstservicesItem(title=title, sub_title=sub_title, description=description, sac_code=sac_code,
                                   rate=rate, id=response.meta['id'])
